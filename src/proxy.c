@@ -1,3 +1,4 @@
+#include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -5,15 +6,20 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include "proxy_cache/cache.h"
 #include "proxy_serve/serve.h"
 #include "socket_interface/interface.h"
 
 #define safe_free(ptr) sfree((void **) &(ptr))
 
 typedef struct sockaddr SA;
+typedef struct vargp {
+    int clientfd;
+    Cache *proxy_cache;
+} Vargp;
 
-static void
-client_serve(int connfd);
+static void*
+client_serve(void* vargp);
 
 static void
 sfree(void **ptr);
@@ -28,6 +34,9 @@ main(int argc, char **argv)
     char hostname[MAX_LINE], port[PORT_LEN];
     socklen_t client_len;
     struct sockaddr_storage client_addr;
+    pthread_t tid;
+    Cache proxy_cache;
+    Vargp *vargp;
 
     signal(SIGPIPE, SIG_IGN);
 
@@ -36,7 +45,9 @@ main(int argc, char **argv)
         fprintf(stderr, "usage: %s <port>\n", argv[0]);
         exit(1);
     }
+
     listenfd = open_listenfd(argv[1]);
+    cache_init(&proxy_cache);
 
     while (1) {
         client_len = sizeof(client_addr);
@@ -44,34 +55,51 @@ main(int argc, char **argv)
             fprintf(stderr, "Connection to (%s, %s) failed\n", hostname, port);
             continue;
         }
-        client_serve(connfd);
-        close(connfd);
+        vargp = malloc(sizeof(Vargp));
+        vargp->clientfd = connfd;
+        vargp->proxy_cache = &proxy_cache;
+        pthread_create(&tid,NULL, client_serve, vargp); 
     }
 }
 
-static void
-client_serve(int connfd)
+static void*
+client_serve(void *vargp)
 {
+    int clientfd;
     Request client_request;
     Response server_respone;
+    Cache *proxy_cache;
+
+    clientfd = ((Vargp *)vargp)->clientfd;
+    proxy_cache = ((Vargp *)vargp)->proxy_cache;
+
+    /* freeing the allocated memeory that vargp points to */
+    free(vargp);
+
+    /* detach the thread after ending its job */
+    pthread_detach(pthread_self());
 
     /* initialize client_request and server_response resources with zero */
     memset(&client_request, 0, sizeof(Request));
     memset(&server_respone, 0, sizeof(Response));
 
-    if (
     /* parse HTTP request */
-    parse_request(connfd, &client_request) < 0 ||
-    /* forward the request to the server if it parsed successfully */
-    forward_request(&client_request, &server_respone) < 0 ||
-    /* forward server response to the client after requesting successfully */
-    forward_response(connfd, &server_respone) < 0) {
-        /* if any problem in the serving then free resourses then return */
-        free_resources(&client_request, &server_respone);
-        return;
+    if (!(parse_request(clientfd, &client_request) < 0)) {
+        /* forward the request to the server if it parsed successfully */
+        if (!(forward_request(&client_request, proxy_cache,
+                              &server_respone) < 0)) {
+            /* forward server response to the client after requesting 
+             *  successfully */
+            if (!(forward_response(clientfd, &server_respone) < 0)) {
+                /* code region if any dependent action after successfull 
+                 * server_respone */
+            }
+        }
     }
 
     free_resources(&client_request, &server_respone);
+    close(clientfd);
+    return NULL;
 }
 
 static void

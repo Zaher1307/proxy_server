@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "serve.h"
+#include "../proxy_cache/cache.h"
 #include "../safe_input_output/sio.h"
 #include "../socket_interface/interface.h"
 
@@ -44,7 +45,6 @@ strtolwr(char *str);
 
 
 
-
 int
 parse_request(int clientfd, Request *client_request)
 {
@@ -74,26 +74,37 @@ parse_request(int clientfd, Request *client_request)
 }
 
 int
-forward_request(const Request *client_request, Response *server_response)
+forward_request(const Request *client_request, Cache *proxy_cache,
+                Response *server_response)
 {
-    int proxyfd;
+    int proxyfd, is_cached;
     char request_line[MAX_LINE], request_headers[MAX_BUF];
 
     build_request_line(client_request, request_line);
     build_request_headers(client_request, request_headers);
 
+    is_cached = cache_fetch(proxy_cache, request_line, request_headers,
+                &server_response->rs_line, &server_response->rs_headers,
+                &server_response->rs_content, 
+                &server_response->rs_content_length);
+    if (!is_cached) {
+        if ((proxyfd = open_clientfd(client_request->rq_hostname,
+                                     client_request->rq_port)) < 0)
+            return -1;
 
-    if ((proxyfd = open_clientfd(client_request->rq_hostname, client_request->rq_port)) < 0)
-        return -1;
+        if (sio_writen(proxyfd, request_line, strlen(request_line)) < 0)
+            return -1;
 
-    if (sio_writen(proxyfd, request_line, strlen(request_line)) < 0)
-        return -1;
+        if (sio_writen(proxyfd, request_headers, strlen(request_headers)) < 0)
+            return -1;
 
-    if (sio_writen(proxyfd, request_headers, strlen(request_headers)) < 0)
-        return -1;
-
-    if (parse_response(proxyfd, server_response) < 0)
-        return -1;
+        if (parse_response(proxyfd, server_response) < 0)
+            return -1;
+        cache_write(proxy_cache, request_line, request_headers,
+                    server_response->rs_line, server_response->rs_headers,
+                    server_response->rs_content, 
+                    server_response->rs_content_length);
+    }
 
     return 0;
 }
@@ -101,11 +112,14 @@ forward_request(const Request *client_request, Response *server_response)
 int
 forward_response(int clientfd, const Response *server_response)
 {
-    if (sio_writen(clientfd, server_response->rs_line, strlen(server_response->rs_line)) < 0)
+    if (sio_writen(clientfd, server_response->rs_line,
+                strlen(server_response->rs_line)) < 0)
         return -1;
-    if (sio_writen(clientfd, server_response->rs_headers, strlen(server_response->rs_headers)) < 0)
+    if (sio_writen(clientfd, server_response->rs_headers,
+                strlen(server_response->rs_headers)) < 0)
         return -1;
-    if (sio_writen(clientfd, server_response->rs_content, server_response->rs_content_length) < 0)
+    if (sio_writen(clientfd, server_response->rs_content,
+                server_response->rs_content_length) < 0)
         return -1;
     
     return 0;
@@ -251,12 +265,14 @@ parse_response(int proxyfd, Response *server_response)
         return -1;
 
     /*parse response headers */
-    if (parse_response_headers(&sio, response_headers, &server_response->rs_content_length) < 0)
+    if (parse_response_headers(&sio, response_headers,
+                &server_response->rs_content_length) < 0)
         return -1;
     
     /* parse response content */
     server_response->rs_content = malloc(server_response->rs_content_length);
-    if (sio_readn(&sio, server_response->rs_content, server_response->rs_content_length) < 0)
+    if (sio_readn(&sio, server_response->rs_content,
+                server_response->rs_content_length) < 0)
         return -1;
         
     /* allocate for the data */
@@ -287,7 +303,8 @@ parse_response_headers(Sio *sio, char *response_headers, size_t *content_length)
 }
 
 static void
-client_error(int clientfd, char *cause, char *errnum, char *short_msg, char *long_msg)
+client_error(int clientfd, char *cause, char *errnum, 
+        char *short_msg, char *long_msg)
 {
     char linebuf[MAX_LINE], body[MAX_BUF];
 
