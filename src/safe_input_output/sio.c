@@ -87,10 +87,9 @@ sio_writen(int fd, void *usrbuf, size_t n)
     	    if (errno == EINTR){             /* Interrputed by sig handler return */
     		    nwritten = 0;                /* and call write() again */
             } else if (errno == EPIPE) {     
-                fprintf(stderr, "%s\n", broken_pipe_msg); /* Interrupted by SIGPIPE */
                 errno = 0;
                 return -1;
-            }else {
+            } else {
     	    	return -1;
             }                                /* errno set by write() */
     	}
@@ -119,7 +118,6 @@ sio_read(Sio *sio, char *usrbuf, size_t n)
     	    if (errno != EINTR) {      /* Interrupted by sig handler return */
     		    return -1;
             } else if (errno == ECONNRESET) {
-                fprintf(stderr, "%s\n", read_error_msg);
                 errno = 0;
                 return -1;
             }
