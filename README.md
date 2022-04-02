@@ -13,11 +13,11 @@ browser.
   `caches` recently-requested web objects.
 - It handles multiple connections at the same time using `multi-threading` 
   programing.
-- It `caches` web objects by storing a copy in disk to respond to future 
+- It `caches` web objects by storing a copy in memory to respond to future 
   connections by reading them from cache if the request already exist.
   It uses least recently used eviction policy.
 
-**NOTE:** All project specifications and usege are mentioned in this
+**NOTE:** All project specifications and usage are mentioned in this
 [writeup](https://github.com/Zaher1307/proxy_server/blob/master/proxylab.pdf)
 
 
