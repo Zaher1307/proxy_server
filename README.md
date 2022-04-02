@@ -6,8 +6,9 @@ the browser contacts the proxy, which forwards the request on to the end server.
 When the end server replies to the proxy, the proxy sends the reply on to the 
 browser.
 
-## Discription
+## Description
 - It's the last lab of [15-213: Introduction to Computer Systems](https://www.cs.cmu.edu/afs/cs.cmu.edu/academic/class/15213-f15/www/schedule.html).
+- The coding style is inspired from `Suckless` [coding style guidelines](https://suckless.org/coding_style/).
 - It's a simple `concurrent` HTTP proxy that handles `HTTP/1.0` `GET` requests and 
   `caches` recently-requested web objects.
 - It handles multiple connections at the same time using `multi-threading` 
