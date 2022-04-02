@@ -1,7 +1,10 @@
 #include <ctype.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+
 
 #include "serve.h"
 #include "../proxy_cache/cache.h"
@@ -10,6 +13,7 @@
 
 
 #define DEFAULT_HEADERS_SIZE 130
+
 
 static const char *usr_agent_header = "User_Agent: Mozilla/5.0 (X11; Linux x86_64; rv:98.0) Gecko/20100101 Firefox/98.0\r\n";
 static const char *connection_header = "Connection: close\r\n";
@@ -36,14 +40,11 @@ parse_response(int proxyfd, Response *server_response);
 
 static int
 parse_response_headers(Sio *sio, char *response_headers, size_t *content_length);
-
 static void
 client_error(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg);
 
 static void
 strtolwr(char *str);
-
-
 
 int
 parse_request(int clientfd, Request *client_request)
@@ -54,15 +55,13 @@ parse_request(int clientfd, Request *client_request)
 
     sio_initbuf(&sio, clientfd);
 
-    if (parse_request_line(&sio, method, url) < 0) {
+    if (parse_request_line(&sio, method, url) < 0) 
         return -1;
-    }
-    if (parse_request_headers(&sio, headers, hostname) < 0) {
-        return -1;
-    }
 
     parse_url(url, hostname, port, uri);
 
+    if (parse_request_headers(&sio, headers, hostname) < 0) 
+        return -1;
 
     client_request->rq_headers = strdup(headers);
     client_request->rq_hostname = strdup(hostname);
@@ -104,6 +103,7 @@ forward_request(const Request *client_request, Cache *proxy_cache,
                     server_response->rs_line, server_response->rs_headers,
                     server_response->rs_content, 
                     server_response->rs_content_length);
+        close(proxyfd);
     }
 
     return 0;
@@ -242,14 +242,24 @@ build_request_line(const Request *client_request, char *request_line)
 }
 
 static void
-build_request_headers(const Request *clinet_request, char *request_headers)
+build_request_headers(const Request *client_request, char *request_headers)
 {
+    char linebuf[MAX_LINE];
+
     request_headers[0] = '\0';
+
+    /* append host request header if not appended */
+    if (!strstr(client_request->rq_headers, "Host")) {
+        sprintf(linebuf, "Host: %s\r\n", client_request->rq_hostname);
+        strcat(request_headers, linebuf);
+    }
 
     strcat(request_headers, usr_agent_header);
     strcat(request_headers, connection_header);
     strcat(request_headers, proxy_connection_header);
-    strcat(request_headers, clinet_request->rq_headers);
+    strcat(request_headers, client_request->rq_headers);
+    
+    printf("%s\n", request_headers);
 }
 
 static int
