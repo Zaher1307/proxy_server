@@ -74,7 +74,7 @@ client_serve(void *vargp)
     proxy_cache = ((Vargp *)vargp)->proxy_cache;
 
     /* freeing the allocated memeory that vargp points to */
-    free(vargp);
+    safe_free(vargp); 
 
     /* detach the thread after ending its job */
     pthread_detach(pthread_self());

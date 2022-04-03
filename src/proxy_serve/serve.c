@@ -259,7 +259,6 @@ build_request_headers(const Request *client_request, char *request_headers)
     strcat(request_headers, proxy_connection_header);
     strcat(request_headers, client_request->rq_headers);
     
-    printf("%s\n", request_headers);
 }
 
 static int

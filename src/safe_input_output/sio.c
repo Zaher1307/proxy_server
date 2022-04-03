@@ -8,8 +8,6 @@
 static ssize_t
 sio_read (Sio *sio, char *usrbuf, size_t n);
 
-static const char *broken_pipe_msg = "broken pipe: writing to a connection that has already been closed by the client";
-static const char *read_error_msg = "Read error: reading from a socket that has been prematurely close";
 
 /*
  * sio_initbuf - Associate a descriptor with a read buffer and reset buffer

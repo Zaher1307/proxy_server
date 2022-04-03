@@ -12,7 +12,7 @@ static int
 find_empty_line(Cache *cache);
 
 static int
-find_victim(Cache *cache);
+find_and_distruct_victim(Cache *cache);
 
 static int
 find_line(Cache *cache, unsigned int tag);
@@ -36,6 +36,8 @@ cache_write(Cache *cache, const char *request_line, const char *request_headers,
     int index;
     unsigned int tag; 
     size_t object_size;
+    char *response_line_ptr, *response_headers_ptr;
+    void *content_ptr;
 
     /* check if the object_size can be fit in the cache line */
     object_size = content_length + strlen(response_line) 
@@ -46,23 +48,31 @@ cache_write(Cache *cache, const char *request_line, const char *request_headers,
     /* Create copy to be cached */
     tag = generate_tag(request_line, request_headers);
 
+    /* 
+     * Allocate for response content to avoid allocation overhead while
+     * acquiring the mutex 
+     */
+    response_line_ptr = strdup(response_line);
+    response_headers_ptr = strdup(response_headers);
+    content_ptr = malloc(content_length);
+    memcpy(content_ptr, content, content_length);
+
     /* Acquire the the write mutex to protect writing process */
     sem_wait(&cache->write_mutex);
 
     /* Find empty cache line */
     index = find_empty_line(cache);
     if (index < 0)
-        index = find_victim(cache);
+        index = find_and_distruct_victim(cache); // misleading name
     
     /* Place cache line */
     cache->cache_set[index].valid = 1;
     cache->cache_set[index].tag = tag;
     cache->cache_set[index].timestamp = ++cache->highest_timestamp;
     cache->cache_set[index].content_length = content_length;
-    cache->cache_set[index].response_line = strdup(response_line);
-    cache->cache_set[index].response_headers = strdup(response_headers);
-    cache->cache_set[index].content = malloc(content_length);
-    memcpy(cache->cache_set[index].content, content, content_length);
+    cache->cache_set[index].response_line = response_line_ptr;
+    cache->cache_set[index].response_headers = response_headers_ptr;
+    cache->cache_set[index].content = content_ptr;
 
     /* Release the write_mutex */
     sem_post(&cache->write_mutex);
@@ -143,7 +153,7 @@ find_empty_line(Cache *cache)
 }
 
 static int
-find_victim(Cache *cache)
+find_and_distruct_victim(Cache *cache)
 {
     int index, least_recent_used;
 
@@ -157,6 +167,7 @@ find_victim(Cache *cache)
     }
 
     /* Free the memory used by the victim line */
+    // safe_free
     free(cache->cache_set[index].response_line);
     free(cache->cache_set[index].response_headers);
     free(cache->cache_set[index].content);
