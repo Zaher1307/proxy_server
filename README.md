@@ -102,10 +102,11 @@ It is consisted of some modules with the following details:
      GET http://www.example.com HTTP/1.0
      ``` 
 
-    or you can clone and send request to my http [`tiny_web_server`](https://github.com/Zaher1307/tiny_web_server)
-    instead of http websites.
+    or you can clone and send request to my http [`tiny_web_server`](https://github.com/Zaher1307/tiny_web_server).
 
     *browser:*
+    you can use these [`website`](https://github.com/Zaher1307/proxy_server/blob/master/example_web_sites.txt)
+    to test the proxy.
  
      ``` 
      http://www.example.com
