@@ -93,7 +93,7 @@ It is consisted of some modules with the following details:
       ./proxy <port>
      ``` 
 
-2) **Send and HTTP request to the server using**
+2) **Send an HTTP request to the server using**
 
     *telnet:*
 
